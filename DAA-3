@@ -1,0 +1,36 @@
+# Fractional Knapsack Problem using Greedy Method
+
+def fractional_knapsack(weights, values, capacity):
+    # Step 1: Create list of items with value, weight, and value/weight ratio
+    items = []
+    for i in range(len(values)):
+        ratio = values[i] / weights[i]
+        items.append((ratio, values[i], weights[i]))  # (value/weight, value, weight)
+
+    # Step 2: Sort items in descending order of ratio (highest value per weight first)
+    items.sort(reverse=True)
+
+    total_value = 0  # total value collected in knapsack
+    for ratio, value, weight in items:
+        if capacity == 0:
+            break  # knapsack is full
+
+        # If whole item can be added
+        if weight <= capacity:
+            total_value += value
+            capacity -= weight
+        else:
+            # Take only fraction of item
+            fraction = capacity / weight
+            total_value += value * fraction
+            capacity = 0  # now knapsack is full
+
+    return total_value
+
+# Example usage
+values = [60, 100, 120]
+weights = [10, 20, 30]
+capacity = 50
+
+max_value = fractional_knapsack(weights, values, capacity)
+print("Maximum value in Knapsack =", max_value)

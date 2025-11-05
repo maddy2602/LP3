@@ -1,0 +1,72 @@
+import heapq
+from collections import defaultdict
+
+# Node class for the Huffman Tree
+class HuffmanNode:
+    def __init__(self, char, freq):
+        self.char = char
+        self.freq = freq
+        self.left = None
+        self.right = None
+
+    # Define comparison between nodes (needed for heapq)
+    def __lt__(self, other):
+        return self.freq < other.freq
+
+# Function to generate Huffman Codes using greedy strategy
+def huffman_encoding(data):
+    if not data:
+        return "", {}
+
+    # Step 1: Frequency dictionary
+    freq_dict = defaultdict(int)
+    for char in data:
+        freq_dict[char] += 1
+
+    # Step 2: Create a priority queue (min-heap)
+    heap = []
+    for char, freq in freq_dict.items():
+        heapq.heappush(heap, HuffmanNode(char, freq))
+
+    # Step 3: Build Huffman Tree using greedy strategy
+    while len(heap) > 1:
+        node1 = heapq.heappop(heap)
+        node2 = heapq.heappop(heap)
+
+        # Create a new internal node
+        merged = HuffmanNode(None, node1.freq + node2.freq)
+        merged.left = node1
+        merged.right = node2
+
+        heapq.heappush(heap, merged)
+
+    root = heap[0]
+
+    # Step 4: Traverse the tree to get codes
+    huffman_codes = {}
+
+    def generate_codes(node, current_code):
+        if node is None:
+            return
+        # If it's a leaf node (contains a character)
+        if node.char is not None:
+            huffman_codes[node.char] = current_code
+            return
+        generate_codes(node.left, current_code + "0")
+        generate_codes(node.right, current_code + "1")
+
+    generate_codes(root, "")
+
+    # Step 5: Encode data
+    encoded_data = "".join(huffman_codes[char] for char in data)
+    return encoded_data, huffman_codes
+
+
+# Example Usage
+if __name__ == "__main__":
+    text = "loose"
+    encoded_text, codes = huffman_encoding(text)
+
+    print("Original Text:", text)
+    print("Huffman Codes:", codes)
+    print("Encoded Text:", encoded_text)

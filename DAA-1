@@ -1,0 +1,15 @@
+def fibo_rec(n):
+    if n <= 1:
+        return n
+    return fibo_rec(n-1) + fibo_rec(n-2)
+    
+for i in range(10):
+    print(fibo_rec(i))
+    
+def fibo_ite(n):
+    a, b = 0, 1
+    for _ in range(n):
+        print(a)
+        a, b = b, a+b
+        
+fibo_ite(10)

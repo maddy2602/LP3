@@ -1,0 +1,156 @@
+# 📌 Practical 1 – Uber Data Analysis & Fare Prediction
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+
+# -------------------------------
+# 1. Load and Clean Dataset
+# -------------------------------
+
+df = pd.read_csv("uber.csv")
+df.dropna(how='any', inplace=True)
+
+# -------------------------------
+# 2. Outlier Detection (Boxplots)
+# -------------------------------
+
+for col in df.select_dtypes(exclude=['object']):
+    plt.figure()
+    sns.boxplot(data=df, x=col)
+    plt.title(f"Boxplot of {col}")
+    plt.show()
+
+# -------------------------------
+# 3. Remove Invalid Values
+# -------------------------------
+
+df = df[
+    (df.pickup_latitude > -90) & (df.pickup_latitude < 90) &
+    (df.dropoff_latitude > -90) & (df.dropoff_latitude < 90) &
+    (df.pickup_longitude > -180) & (df.pickup_longitude < 180) &
+    (df.dropoff_longitude > -180) & (df.dropoff_longitude < 180) &
+    (df.fare_amount > 0) &
+    (df.passenger_count > 0) & (df.passenger_count < 50)
+]
+
+# -------------------------------
+# 4. Distance Calculation
+# -------------------------------
+
+def distance(lat_1, lon_1, lat_2, lon_2):
+    lon_1, lon_2, lat_1, lat_2 = map(np.radians, [lon_1, lon_2, lat_1, lat_2])
+    diff_lon = lon_2 - lon_1
+    diff_lat = lat_2 - lat_1
+
+    km = 2 * 6371 * np.arcsin(
+        np.sqrt(
+            np.sin(diff_lat / 2.0) ** 2 +
+            np.cos(lat_1) * np.cos(lat_2) * np.sin(diff_lon / 2.0) ** 2
+        )
+    )
+    return km
+
+df['Distance'] = distance(df['pickup_latitude'], df['pickup_longitude'],
+                          df['dropoff_latitude'], df['dropoff_longitude'])
+
+# Distance boxplot
+plt.figure()
+sns.boxplot(data=df, x='Distance')
+plt.title("Boxplot of Trip Distances")
+plt.show()
+
+# Keep only realistic distances
+df = df[(df['Distance'] < 200) & (df['Distance'] > 0)]
+
+# -------------------------------
+# 5. Date-Time Feature Engineering
+# -------------------------------
+
+df['pickup_datetime'] = pd.to_datetime(df['pickup_datetime'])
+df['week_day'] = df['pickup_datetime'].dt.day_name()
+df['Year'] = df['pickup_datetime'].dt.year
+df['Month'] = df['pickup_datetime'].dt.month
+df['Hour'] = df['pickup_datetime'].dt.hour
+
+# Drop raw lat/long and datetime
+df.drop(columns=['pickup_datetime', 'pickup_latitude', 'pickup_longitude',
+                 'dropoff_latitude', 'dropoff_longitude'], inplace=True)
+
+# -------------------------------
+# 6. Convert Categorical to Numeric
+# -------------------------------
+
+def convert_week_day(day):
+    if day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday']:
+        return 0  # Weekday
+    return 1  # Weekend
+
+def convert_hour(hour):
+    if 5 <= hour <= 12: return 1  # Morning
+    elif 12 < hour <= 17: return 2  # Afternoon
+    elif 17 < hour < 24: return 3  # Evening
+    return 0  # Night
+
+df['week_day'] = df['week_day'].apply(convert_week_day)
+df['Hour'] = df['Hour'].apply(convert_hour)
+
+# -------------------------------
+# 7. Correlation & Scatter Plot
+# -------------------------------
+
+print(df.corr())
+plt.figure()
+sns.scatterplot(x=df['Distance'], y=df['fare_amount'])
+plt.title("Fare vs Distance")
+plt.show()
+
+# -------------------------------
+# 8. Train-Test Split
+# -------------------------------
+
+x = df[['Distance']].values
+y = df['fare_amount'].values.reshape(-1, 1)
+
+x_train, x_test, y_train, y_test = train_test_split(x, y, random_state=10)
+
+# Standardization
+std_x = StandardScaler()
+x_train = std_x.fit_transform(x_train)
+x_test = std_x.transform(x_test)
+
+std_y = StandardScaler()
+y_train = std_y.fit_transform(y_train)
+y_test = std_y.transform(y_test)
+
+# -------------------------------
+# 9. Model Evaluation Function
+# -------------------------------
+
+def fit_predict(model, model_name):
+    model.fit(x_train, y_train.ravel())
+    y_pred = model.predict(x_test)
+
+    r_squared = r2_score(y_test, y_pred)
+    mse = mean_squared_error(y_test, y_pred)
+    rmse = np.sqrt(mse)
+    mae = mean_absolute_error(y_test, y_pred)
+
+    print(f"\n📌 Model: {model_name}")
+    print("R-squared:", r_squared)
+    print("RMSE:", rmse)
+    print("MAE:", mae)
+
+# -------------------------------
+# 10. Run Models
+# -------------------------------
+
+fit_predict(LinearRegression(), "Linear Regression")
+fit_predict(RandomForestRegressor(), "Random Forest Regressor")

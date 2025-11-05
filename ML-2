@@ -1,0 +1,96 @@
+# 📌 Practical 2 – Email Spam Detection using KNN and SVM
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn.metrics import (
+    classification_report, confusion_matrix, roc_curve, auc,
+    precision_recall_curve
+)
+
+# ------------------------------------
+# 1. Load and preprocess dataset
+# ------------------------------------
+df = pd.read_csv("emails.csv")
+df.dropna(how='any', inplace=True)
+
+# Features and Target
+x = df.iloc[:, 1:-1].values  # All columns except id & spam
+y = df.iloc[:, -1].values    # Last column → spam/ham (0 or 1)
+
+# Train-test split
+x_train, x_test, y_train, y_test = train_test_split(
+    x, y, test_size=0.25, random_state=10
+)
+
+# ------------------------------------
+# 2. Helper function to evaluate models
+# ------------------------------------
+def evaluate_model(model, x_train, x_test, y_train, y_test, model_name, use_proba=True):
+    model.fit(x_train, y_train)
+    y_pred = model.predict(x_test)
+
+    print(f"\n===== {model_name} =====")
+    print("Classification Report:\n", classification_report(y_test, y_pred))
+
+    # Confusion Matrix
+    confusion = confusion_matrix(y_test, y_pred)
+    recall_val = confusion[1, 1] / (confusion[1, 0] + confusion[1, 1])
+    fpr_val = confusion[0, 1] / (confusion[0, 0] + confusion[0, 1])
+    print(f"Recall: {recall_val:.4f}")
+    print(f"False Positive Rate: {fpr_val:.4f}")
+
+    # Probability scores for curves
+    if use_proba:
+        y_scores = model.predict_proba(x_test)[:, 1]
+    else:
+        y_scores = model.decision_function(x_test)
+
+    # Precision-Recall Curve
+    precision, recall, _ = precision_recall_curve(y_test, y_scores)
+
+    plt.figure(figsize=(8, 6))
+    plt.plot(recall, precision, lw=2, label="Precision-Recall Curve")
+    plt.xlabel("Recall")
+    plt.ylabel("Precision")
+    plt.title(f"{model_name}: Precision vs Recall")
+    plt.legend()
+    plt.show()
+
+    # Confusion Matrix Heatmap
+    plt.figure(figsize=(6, 5))
+    sns.heatmap(confusion, annot=True, fmt="d", cmap="Blues", cbar=False)
+    plt.xlabel("Predicted")
+    plt.ylabel("True")
+    plt.title(f"{model_name}: Confusion Matrix")
+    plt.show()
+
+    # ROC Curve
+    fpr, tpr, _ = roc_curve(y_test, y_scores)
+    roc_auc = auc(fpr, tpr)
+
+    plt.figure(figsize=(8, 6))
+    plt.plot(fpr, tpr, lw=2, label=f"AUC = {roc_auc:.2f}")
+    plt.plot([0, 1], [0, 1], linestyle="--")
+    plt.xlabel("False Positive Rate")
+    plt.ylabel("True Positive Rate")
+    plt.title(f"{model_name}: ROC Curve")
+    plt.legend()
+    plt.show()
+
+# ------------------------------------
+# 3. Train and Evaluate Models
+# ------------------------------------
+
+# ✅ KNN Classifier
+kNN = KNeighborsClassifier(n_neighbors=10)
+evaluate_model(kNN, x_train, x_test, y_train, y_test, "K-Nearest Neighbors", use_proba=True)
+
+# ✅ SVM Classifier (with probability=True to enable ROC/PR)
+svm_model = SVC(gamma="auto", random_state=10, probability=True)
+evaluate_model(svm_model, x_train, x_test, y_train, y_test, "Support Vector Machine", use_proba=True)

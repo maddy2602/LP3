@@ -1,0 +1,129 @@
+# -----------------------------------------------
+# Practical 5: Sales Data Clustering using RFM Analysis
+# -----------------------------------------------
+
+# ✅ STEP 1: Import Libraries
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import datetime as dt
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
+
+# -----------------------------------------------
+# ✅ STEP 2: Load and Inspect Dataset
+# -----------------------------------------------
+df = pd.read_csv("sales_data_sample.csv", encoding="unicode_escape")
+print("First 5 Rows of Dataset:\n", df.head())
+print("\nDataset Info:\n")
+print(df.info())
+
+# -----------------------------------------------
+# ✅ STEP 3: Drop Unnecessary Columns
+# -----------------------------------------------
+cols_to_drop = [
+    "ADDRESSLINE1", "ADDRESSLINE2", "POSTALCODE", "CITY", "TERRITORY",
+    "PHONE", "STATE", "CONTACTFIRSTNAME", "CONTACTLASTNAME"
+]
+df.drop(columns=cols_to_drop, inplace=True, errors='ignore')
+print("\nColumns after cleaning:\n", df.columns)
+
+# -----------------------------------------------
+# ✅ STEP 4: Convert ORDERDATE to Datetime
+# -----------------------------------------------
+df["ORDERDATE"] = pd.to_datetime(df["ORDERDATE"], errors="coerce")
+
+# -----------------------------------------------
+# ✅ STEP 5: RFM Feature Engineering
+# -----------------------------------------------
+snapshot_date = df["ORDERDATE"].max() + dt.timedelta(days=1)
+
+df_RFM = df.groupby("CUSTOMERNAME").agg({
+    "ORDERDATE": lambda x: (snapshot_date - x.max()).days,   # Recency
+    "ORDERNUMBER": "count",                                 # Frequency
+    "SALES": "sum"                                          # Monetary
+})
+
+df_RFM.rename(columns={
+    "ORDERDATE": "Recency",
+    "ORDERNUMBER": "Frequency",
+    "SALES": "MonetaryValue"
+}, inplace=True)
+
+print("\nSample RFM Table:\n", df_RFM.head())
+
+# -----------------------------------------------
+# ✅ STEP 6: Assign RFM Scores
+# -----------------------------------------------
+df_RFM["R"] = pd.qcut(df_RFM["Recency"], q=4, labels=[4, 3, 2, 1])
+df_RFM["F"] = pd.qcut(df_RFM["Frequency"], q=4, labels=[1, 2, 3, 4])
+df_RFM["M"] = pd.qcut(df_RFM["MonetaryValue"], q=4, labels=[1, 2, 3, 4])
+
+df_RFM["RFM_Score"] = df_RFM[["R", "F", "M"]].astype(int).sum(axis=1)
+
+def rfm_level(row):
+    if row["RFM_Score"] >= 10:
+        return "High Value Customer"
+    elif 6 <= row["RFM_Score"] < 10:
+        return "Mid Value Customer"
+    else:
+        return "Low Value Customer"
+
+df_RFM["RFM_Level"] = df_RFM.apply(rfm_level, axis=1)
+
+print("\nRFM Categorized Data:\n", df_RFM.head())
+
+# -----------------------------------------------
+# ✅ STEP 7: Prepare Data for Clustering
+# -----------------------------------------------
+data = df_RFM[["Recency", "Frequency", "MonetaryValue"]]
+
+# Log transform to reduce skewness
+data_log = np.log1p(data)
+
+# Standardization
+scaler = StandardScaler()
+data_normalized = pd.DataFrame(
+    scaler.fit_transform(data_log),
+    index=data_log.index,
+    columns=data_log.columns
+)
+
+print("\nNormalized Data Summary:\n", data_normalized.describe().round(2))
+
+# -----------------------------------------------
+# ✅ STEP 8: Elbow Method (Find Optimal K)
+# -----------------------------------------------
+sse = {}
+for k in range(1, 15):
+    kmeans = KMeans(n_clusters=k, random_state=42)
+    kmeans.fit(data_normalized)
+    sse[k] = kmeans.inertia_
+
+plt.figure(figsize=(10, 6))
+plt.plot(list(sse.keys()), list(sse.values()), marker="o")
+plt.title("Elbow Method - Optimal K")
+plt.xlabel("Number of Clusters (k)")
+plt.ylabel("SSE")
+plt.grid(True)
+plt.show()
+
+# -----------------------------------------------
+# ✅ STEP 9: Apply KMeans with Optimal K (Example: K=5)
+# -----------------------------------------------
+kmeans = KMeans(n_clusters=5, random_state=42)
+df_RFM["Cluster"] = kmeans.fit_predict(data_normalized)
+
+print("\nClustered RFM Data:\n", df_RFM.head())
+
+# -----------------------------------------------
+# ✅ STEP 10: Visualize Clusters
+# -----------------------------------------------
+plt.figure(figsize=(8, 6))
+sns.scatterplot(
+    x="Recency", y="MonetaryValue",
+    hue="Cluster", data=df_RFM, palette="tab10"
+)
+plt.title("Customer Clusters (Recency vs MonetaryValue)")
+plt.show()

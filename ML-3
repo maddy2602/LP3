@@ -1,0 +1,77 @@
+# ----------------------------------
+# 📌 Practical 3: Gradient Descent Implementation
+# ----------------------------------
+
+import numpy as np
+import matplotlib.pyplot as plt
+from sympy import Symbol, lambdify
+
+# Define symbolic variable
+x = Symbol("x")
+
+# ----------------------------------
+# 1. Gradient Descent Function
+# ----------------------------------
+def gradient_descent(function, start, learn_rate, n_iter=10000, tolerance=1e-6):
+    """
+    Performs gradient descent on a given function.
+    :param function: Sympy function (e.g. (x+5)**2)
+    :param start: Initial value of x
+    :param learn_rate: Step size / learning rate
+    :param n_iter: Maximum number of iterations
+    :param tolerance: Minimum step size for convergence
+    """
+
+    # Create symbolic gradient & numerical versions
+    gradient = lambdify(x, function.diff(x))
+    function_eval = lambdify(x, function)
+
+    points = [start]   # To store path of descent
+    iters = 0
+    step_size = tolerance + 1  # To start loop
+
+    # -----------------------------------
+    # Gradient Descent Loop
+    # -----------------------------------
+    while step_size > tolerance and iters < n_iter:
+        prev_x = start
+        start = start - learn_rate * gradient(prev_x)
+        step_size = abs(start - prev_x)
+
+        iters += 1
+        points.append(start)
+
+    print("✅ The local minimum occurs at:", start)
+
+    # -----------------------------------
+    # Visualization
+    # -----------------------------------
+    x_vals = np.linspace(-7, 5, 200)  # X-axis range
+    y_vals = function_eval(x_vals)    # Function values
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Axis through origin
+    ax.spines["left"].set_position("center")
+    ax.spines["bottom"].set_position("zero")
+    ax.spines["right"].set_color("none")
+    ax.spines["top"].set_color("none")
+    ax.xaxis.set_ticks_position("bottom")
+    ax.yaxis.set_ticks_position("left")
+
+    # Plot function curve
+    plt.plot(x_vals, y_vals, "r", label="Function")
+
+    # Plot gradient descent path
+    plt.plot(points, function_eval(np.array(points)), "-o", label="Descent Path")
+
+    plt.title("📉 Gradient Descent Visualization")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+# ----------------------------------
+# 2. Example Run
+# ----------------------------------
+function = (x + 5) ** 2   # Example: f(x) = (x+5)^2
+gradient_descent(function=function, start=3.0, learn_rate=0.2, n_iter=50)

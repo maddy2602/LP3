@@ -3,36 +3,43 @@ pragma solidity ^0.8.0;
 
 contract StudentRegistry {
     struct Student {
+        int id;
         string name;
-        uint256 age;
+        string department;
     }
 
-    Student[] private students;
+    // Mapping from student ID to Student
+    mapping(int => Student) private students;
+    int[] private studentIds; // To keep track of all IDs for counting
 
-    // Define an event to log the received Ether value
+    // Event to log received Ether
     event ReceivedEther(address indexed sender, uint256 value);
 
+    // Function to receive Ether
     receive() external payable {
-        // This function can receive Ether, but it doesn't do anything in this example.
-        // Log the received Ether value
         emit ReceivedEther(msg.sender, msg.value);
     }
 
     fallback() external payable {
-        // Fallback function to receive Ether
         emit ReceivedEther(msg.sender, msg.value);
     }
 
-    function addStudent(string memory name, uint256 age) public {
-        students.push(Student(name, age));
+    // Add a new student
+    function addStudent(int id, string memory name, string memory department) public {
+        require(bytes(students[id].name).length == 0, "Student ID already exists");
+        students[id] = Student(id, name, department);
+        studentIds.push(id);
     }
 
-    function getStudent(uint256 index) public view returns (string memory, uint256) {
-        require(index < students.length, "Student not found");
-        return (students[index].name, students[index].age);
+    // Get a student by ID
+    function getStudent(int id) public view returns (int, string memory, string memory) {
+        require(bytes(students[id].name).length != 0, "Student not found");
+        Student memory s = students[id];
+        return (s.id, s.name, s.department);
     }
 
+    // Get total number of students
     function getStudentCount() public view returns (uint256) {
-        return students.length;
+        return studentIds.length;
     }
 }
